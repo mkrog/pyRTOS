@@ -1,10 +1,27 @@
+import time
 import pyRTOS
-
 
 # User defined message types start at 128
 REQUEST_DATA = 128
 SENT_DATA = 129
 
+class TimeoutCatchUp():
+	def __init__(self, dt):
+		self.dt = dt
+		self._last_tic = time.monotonic()
+
+	def __next__(self):
+		if time.monotonic() >= (self._last_tic + self.dt):
+			self._last_tic += self.dt
+			return True
+		else:
+			return False
+
+	def timeout(self, dt=None):
+		if dt:
+			self.dt = dt
+		return self
+	
 
 # self is the thread object this runs in
 def sample_task(self):
@@ -76,9 +93,30 @@ def sample_task(self):
 		yield [pyRTOS.wait_for_message(self)]
 
 
-pyRTOS.add_task(pyRTOS.Task(sample_task, name="task1", mailbox=True))
-pyRTOS.add_task(pyRTOS.Task(sample_task, name="task2", mailbox=True))
-pyRTOS.add_service_routine(lambda: print("Service Routine Executing"))
+def sample_tick(self):
+	timer = TimeoutCatchUp(0.50)
+	tic = time.monotonic()
+	start = tic
+	yield
 
+	while True:
+		yield [timer.timeout()]
+		print(f"{time.monotonic()-tic}")
+		tic = time.monotonic()
+		if (tic-start) > 5:
+			return
+
+
+def my_service_func():
+	time.sleep(0.1)
+	print(".", end="", flush=True)
+
+
+pyRTOS.add_task(pyRTOS.Task(sample_tick, name="sample_tick"))
+#pyRTOS.add_task(pyRTOS.Task(sample_task, name="task1", mailbox=True))
+#pyRTOS.add_task(pyRTOS.Task(sample_task, name="task2", mailbox=True))
+#pyRTOS.add_service_routine(lambda: print("Service Routine Executing"))
+#pyRTOS.add_service_routine(lambda: time.sleep(0.05))
+pyRTOS.add_service_routine(my_service_func)
 
 pyRTOS.start()
